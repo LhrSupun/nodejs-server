@@ -1,7 +1,7 @@
 const net = require('net');
 const WebSocket = require('ws');
 
-const TCP_PORT = 3500; // Port for TCP connections
+const TCP_PORT = 30080; // Port for TCP connections
 const WS_PORT = 8080; // Port for WebSocket clients
 
 // WebSocket Server

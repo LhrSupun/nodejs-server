@@ -36,6 +36,16 @@ const tcpServer = net.createServer((socket) => {
     });
 });
 
+// Error handling for TCP server
+tcpServer.on('error', (err) => {
+    console.error('TCP Server error:', err);
+});
+
 tcpServer.listen(TCP_PORT, () => {
     console.log(`TCP Server listening on port ${TCP_PORT}`);
+});
+
+// WebSocket server error handling
+wss.on('error', (err) => {
+    console.error('WebSocket Server error:', err);
 });

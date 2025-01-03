@@ -1,51 +1,113 @@
 const net = require('net');
 const WebSocket = require('ws');
 
-const TCP_PORT = 30080; // Port for TCP connections
-const WS_PORT = 8080; // Port for WebSocket clients
+// RFID TCP Server Configuration
+const RFID_TCP_PORT = 30080;
+const RFID_WS_PORT = 8080;
 
-// WebSocket Server
-const wss = new WebSocket.Server({ port: WS_PORT }, () => {
-    console.log(`WebSocket Server listening on ws://localhost:${WS_PORT}`);
+// Weight Scale Configuration
+const WEIGHT_HOST = '10.40.7.181';
+const WEIGHT_PORT = 7000;
+const WEIGHT_WS_PORT = 8081;
+
+// WebSocket Server for RFID
+const rfidWss = new WebSocket.Server({ port: RFID_WS_PORT }, () => {
+    console.log(`RFID WebSocket Server listening on ws://localhost:${RFID_WS_PORT}`);
 });
 
-// Broadcast to all connected WebSocket clients
-function broadcastToClients(data) {
-    wss.clients.forEach((client) => {
+// WebSocket Server for Weight
+const weightWss = new WebSocket.Server({ port: WEIGHT_WS_PORT }, () => {
+    console.log(`Weight WebSocket Server listening on ws://localhost:${WEIGHT_WS_PORT}`);
+});
+
+// Broadcast functions for each WebSocket server
+function broadcastRFID(data) {
+    rfidWss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
             client.send(data);
         }
     });
 }
 
-// TCP Server
-const tcpServer = net.createServer((socket) => {
-    console.log('New TCP connection:', socket.remoteAddress, socket.remotePort);
+function broadcastWeight(data) {
+    weightWss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(data);
+        }
+    });
+}
+
+// RFID TCP Server
+const rfidServer = net.createServer((socket) => {
+    console.log('New RFID TCP connection:', socket.remoteAddress, socket.remotePort);
 
     socket.on('data', (data) => {
-        console.log('Data received from TCP:', data.toString());
-        broadcastToClients(data.toString()); // Send data to WebSocket clients
+        const rfidData = data.toString();
+        console.log('RFID Data received:', rfidData);
+        broadcastRFID(rfidData);
     });
 
     socket.on('end', () => {
-        console.log('TCP connection closed');
+        console.log('RFID TCP connection closed');
     });
 
     socket.on('error', (err) => {
-        console.error('TCP Socket error:', err);
+        console.error('RFID TCP Socket error:', err);
     });
 });
 
-// Error handling for TCP server
-tcpServer.on('error', (err) => {
-    console.error('TCP Server error:', err);
+// Weight Scale Client
+const weightClient = new net.Socket();
+
+function connectWeightScale() {
+    weightClient.connect(WEIGHT_PORT, WEIGHT_HOST, () => {
+        console.log(`Connected to weight scale at ${WEIGHT_HOST}:${WEIGHT_PORT}`);
+    });
+}
+
+weightClient.on('data', (data) => {
+    const weightData = data.toString();
+    console.log('Weight Data received:', weightData);
+    broadcastWeight(weightData);
 });
 
-tcpServer.listen(TCP_PORT, () => {
-    console.log(`TCP Server listening on port ${TCP_PORT}`);
+weightClient.on('close', () => {
+    console.log('Weight scale connection closed');
+    // Reconnect after 5 seconds
+    setTimeout(connectWeightScale, 5000);
 });
 
-// WebSocket server error handling
-wss.on('error', (err) => {
-    console.error('WebSocket Server error:', err);
+weightClient.on('error', (err) => {
+    console.error('Weight scale connection error:', err);
+});
+
+// Start servers
+rfidServer.listen(RFID_TCP_PORT, () => {
+    console.log(`RFID TCP Server listening on port ${RFID_TCP_PORT}`);
+});
+
+// Initial connection to weight scale
+connectWeightScale();
+
+// Error handling
+rfidServer.on('error', (err) => {
+    console.error('RFID TCP Server error:', err);
+});
+
+rfidWss.on('error', (err) => {
+    console.error('RFID WebSocket Server error:', err);
+});
+
+weightWss.on('error', (err) => {
+    console.error('Weight WebSocket Server error:', err);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+    console.log('Shutting down servers...');
+    rfidServer.close();
+    weightClient.destroy();
+    rfidWss.close();
+    weightWss.close();
+    process.exit();
 });

@@ -1,5 +1,9 @@
 const net = require('net');
 const WebSocket = require('ws');
+const express = require('express');
+const cors = require('cors');
+const ThermalPrinter = require('node-thermal-printer').printer;
+const PrinterTypes = require('node-thermal-printer').types;
 
 // RFID TCP Server Configuration
 const RFID_TCP_PORT = 30080;
@@ -9,6 +13,15 @@ const RFID_WS_PORT = 8080;
 const WEIGHT_HOST = '10.40.7.181';
 const WEIGHT_PORT = 7000;
 const WEIGHT_WS_PORT = 8081;
+
+// Thermal Printer Configuration
+const PRINTER_IP = '10.40.7.183';
+const PRINTER_PORT = 9100;
+
+// Express App Setup
+const app = express();
+app.use(cors());
+app.use(express.json());
 
 // WebSocket Server for RFID
 const rfidWss = new WebSocket.Server({ port: RFID_WS_PORT }, () => {
@@ -36,6 +49,51 @@ function broadcastWeight(data) {
         }
     });
 }
+
+// Printer initialization function
+async function initPrinter() {
+    let printer = new ThermalPrinter({
+        type: PrinterTypes.EPSON,
+        interface: `tcp://${PRINTER_IP}:${PRINTER_PORT}`,
+        options: {
+            timeout: 3000
+        },
+        width: 48
+    });
+    return printer;
+}
+
+// Print endpoint
+app.post('/api/print', async (req, res) => {
+    try {
+        const { printData } = req.body;
+        const printer = await initPrinter();
+        
+        const isConnected = await printer.isPrinterConnected();
+        if (!isConnected) {
+            throw new Error('Printer is not connected');
+        }
+
+        printer.alignCenter();
+        printer.setTextDoubleHeight();
+        printer.setTextDoubleWidth();
+        printer.println(printData.title);
+        printer.setTextNormal();
+        
+        printer.alignLeft();
+        printer.println(printData.content);
+        
+        printer.drawLine();
+        printer.println(new Date().toLocaleString());
+        
+        await printer.execute();
+        
+        res.json({ success: true, message: 'Print job sent successfully' });
+    } catch (error) {
+        console.error('Printing error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 // RFID TCP Server
 const rfidServer = net.createServer((socket) => {
@@ -86,6 +144,12 @@ rfidServer.listen(RFID_TCP_PORT, () => {
     console.log(`RFID TCP Server listening on port ${RFID_TCP_PORT}`);
 });
 
+// Start Express server
+const EXPRESS_PORT = 3001;
+app.listen(EXPRESS_PORT, () => {
+    console.log(`Express server listening on port ${EXPRESS_PORT}`);
+});
+
 // Initial connection to weight scale
 connectWeightScale();
 
@@ -109,5 +173,6 @@ process.on('SIGINT', () => {
     weightClient.destroy();
     rfidWss.close();
     weightWss.close();
+    app.close();
     process.exit();
 });

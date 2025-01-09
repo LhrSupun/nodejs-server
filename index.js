@@ -68,7 +68,7 @@ app.post('/api/print', async (req, res) => {
     try {
         const { printData } = req.body;
         const printer = await initPrinter();
-        
+
         const isConnected = await printer.isPrinterConnected();
         if (!isConnected) {
             throw new Error('Printer is not connected');
@@ -76,36 +76,58 @@ app.post('/api/print', async (req, res) => {
 
         // Header
         printer.alignCenter();
-        printer.println(printData.inTime);
-        printer.println('');
+        printer.setTextDoubleHeight();
+        printer.setTextDoubleWidth();
+        printer.bold(true);
+        printer.print(printData.title);
+        printer.setTextNormal();
+        printer.newLine();
+        printer.newLine();
 
         // Ticket Number
         printer.alignLeft();
-        printer.println(`No ${printData.ticket_no}        ${printData.title}`);
+        printer.setTextDoubleHeight();
+        printer.println(`No ${printData.ticket_no}`);
 
         // Vehicle and Supplier Info
+        printer.setTextDoubleHeight();
+        printer.setTextDoubleWidth();
         printer.println(printData.vehicle_number);
+        printer.setTextNormal();
         printer.println(printData.supplier);
         printer.println(printData.address);
-        printer.println('');
 
         // Weight Info
+        printer.alignLeft();
         printer.println('In Time & Weight');
         printer.drawLine();
-        printer.println(`${printData.in_time}    ${printData.gross_weight}`);
-        printer.println('');
 
-        // Footer
-        printer.println(printData.out_time);
-        printer.println(printData.footer);
+        printer.setTextNormal();
+        printer.setTextDoubleHeight();
+        printer.bold(true);
+        printer.leftRight(`${printData.in_time}  `, `${printData.in_weight}`);
+        printer.setTextNormal();
 
+        if (printData.out_time) {
+            printer.drawLine();
+            printer.alignLeft();
+            printer.println('Out Time & Weight');
+            printer.setTextNormal();
+            printer.setTextDoubleHeight();
+            printer.bold(true);
+            printer.leftRight(`${printData.out_time}  `, `${printData.out_weight}`);
+            printer.setTextNormal();
+            printer.newLine();
+        } else {
+            printer.drawLine();
+        }
         printer.cut();
         await printer.execute();
-        
-        res.json({ success: true, message: 'Print job sent successfully' });
+
+        return res.json({ success: true, message: 'Print job sent successfully' });
     } catch (error) {
         console.error('Printing error:', error);
-        res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -139,7 +161,7 @@ function connectWeightScale() {
 
 weightClient.on('data', (data) => {
     const weightData = data.toString();
-    console.log('Weight Data received:', weightData);
+    // console.log('Weight Data received:', weightData);
     broadcastWeight(weightData);
 });
 

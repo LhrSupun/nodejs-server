@@ -74,18 +74,32 @@ app.post('/api/print', async (req, res) => {
             throw new Error('Printer is not connected');
         }
 
+        // Header
         printer.alignCenter();
-        printer.setTextDoubleHeight();
-        printer.setTextDoubleWidth();
-        printer.println(printData.title);
-        printer.setTextNormal();
-        
+        printer.println(printData.inTime);
+        printer.println('');
+
+        // Ticket Number
         printer.alignLeft();
-        printer.println(printData.content);
-        
+        printer.println(`No ${printData.ticket_no}        ${printData.title}`);
+
+        // Vehicle and Supplier Info
+        printer.println(printData.vehicle_number);
+        printer.println(printData.supplier);
+        printer.println(printData.address);
+        printer.println('');
+
+        // Weight Info
+        printer.println('In Time & Weight');
         printer.drawLine();
-        printer.println(new Date().toLocaleString());
-        
+        printer.println(`${printData.in_time}    ${printData.gross_weight}`);
+        printer.println('');
+
+        // Footer
+        printer.println(printData.out_time);
+        printer.println(printData.footer);
+
+        printer.cut();
         await printer.execute();
         
         res.json({ success: true, message: 'Print job sent successfully' });

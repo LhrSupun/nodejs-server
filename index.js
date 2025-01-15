@@ -5,20 +5,24 @@ const cors = require('cors');
 const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
 
+// Load environment variables
+require('dotenv').config();
+
 // RFID TCP Server Configuration
-const RFID_TCP_PORT = 30080;
-const RFID_WS_PORT = 8080;
+const RFID_TCP_PORT = process.env.RFID_TCP_PORT;
+const RFID_WS_PORT = process.env.RFID_WS_PORT;
 
 // Weight Scale Configuration
-const WEIGHT_HOST = '10.40.7.181';
-const WEIGHT_PORT = 7000;
-const WEIGHT_WS_PORT = 8081;
+const WEIGHT_HOST = process.env.WEIGHT_HOST;
+const WEIGHT_PORT = process.env.WEIGHT_PORT;
+const WEIGHT_WS_PORT = process.env.WEIGHT_WS_PORT;
 
 // Thermal Printer Configuration
-const PRINTER_IP = '10.40.7.183';
-const PRINTER_PORT = 9100;
+const PRINTER_IP = process.env.PRINTER_IP;
+const PRINTER_PORT = process.env.PRINTER_PORT;
 
 // Express App Setup
+const EXPRESS_PORT = process.env.EXPRESS_PORT;
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -181,7 +185,6 @@ rfidServer.listen(RFID_TCP_PORT, () => {
 });
 
 // Start Express server
-const EXPRESS_PORT = 3001;
 app.listen(EXPRESS_PORT, () => {
     console.log(`Express server listening on port ${EXPRESS_PORT}`);
 });

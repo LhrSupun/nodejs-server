@@ -4,12 +4,13 @@ const express = require('express');
 const cors = require('cors');
 const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
+const os = require('os');
 
 // Load environment variables
 require('dotenv').config();
 
 // Host IP
-const REQUIRED_HOST_IP = '185'; 
+const REQUIRED_HOST_IP = '10.40.7.185';
 
 // Function to check the host IP address
 function checkHostIP() {
@@ -22,7 +23,7 @@ function checkHostIP() {
             if (netInterface.family === 'IPv4' && !netInterface.internal) {
                 const hostIP = netInterface.address;
                 console.log(`Host IP Address: ${hostIP}`);
-                if (hostIP.startsWith(REQUIRED_HOST_IP)) {
+                if (hostIP === REQUIRED_HOST_IP) {
                     validIP = true;
                     break;
                 }
@@ -32,13 +33,14 @@ function checkHostIP() {
     }
 
     if (!validIP) {
-        console.error(`Error: This program can only run on a host with an IP address starting with ${REQUIRED_HOST_IP}.`);
+        console.error(`Error: This program can only run on a host with IP address ${REQUIRED_HOST_IP}.`);
         process.exit(1); // Terminate the program
     }
 }
 
 // Run the IP address check at startup
 checkHostIP();
+
 
 // RFID TCP Server Configuration
 const RFID_TCP_PORT = process.env.RFID_TCP_PORT;

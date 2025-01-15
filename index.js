@@ -10,7 +10,7 @@ const os = require('os');
 require('dotenv').config();
 
 // Host IP
-const REQUIRED_HOST_IP = '10.40.7.185';
+const REQUIRED_HOST_IP = process.env.REQUIRED_HOST_IP;
 
 // Function to check the host IP address
 function checkHostIP() {

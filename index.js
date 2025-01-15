@@ -4,21 +4,59 @@ const express = require('express');
 const cors = require('cors');
 const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
+const os = require('os');
+
+// Load environment variables
+require('dotenv').config();
+
+// Host IP
+const REQUIRED_HOST_IP = process.env.REQUIRED_HOST_IP;
+
+// Function to check the host IP address
+function checkHostIP() {
+    const networkInterfaces = os.networkInterfaces();
+    let validIP = false;
+
+    // Loop through all network interfaces
+    for (const interfaceName in networkInterfaces) {
+        for (const netInterface of networkInterfaces[interfaceName]) {
+            if (netInterface.family === 'IPv4' && !netInterface.internal) {
+                const hostIP = netInterface.address;
+                console.log(`Host IP Address: ${hostIP}`);
+                if (hostIP === REQUIRED_HOST_IP) {
+                    validIP = true;
+                    break;
+                }
+            }
+        }
+        if (validIP) break;
+    }
+
+    if (!validIP) {
+        console.error(`Error: This program can only run on a host with IP address ${REQUIRED_HOST_IP}.`);
+        process.exit(1); // Terminate the program
+    }
+}
+
+// Run the IP address check at startup
+checkHostIP();
+
 
 // RFID TCP Server Configuration
-const RFID_TCP_PORT = 30080;
-const RFID_WS_PORT = 8080;
+const RFID_TCP_PORT = process.env.RFID_TCP_PORT;
+const RFID_WS_PORT = process.env.RFID_WS_PORT;
 
 // Weight Scale Configuration
-const WEIGHT_HOST = '10.40.7.181';
-const WEIGHT_PORT = 7000;
-const WEIGHT_WS_PORT = 8081;
+const WEIGHT_HOST = process.env.WEIGHT_HOST;
+const WEIGHT_PORT = process.env.WEIGHT_PORT;
+const WEIGHT_WS_PORT = process.env.WEIGHT_WS_PORT;
 
 // Thermal Printer Configuration
-const PRINTER_IP = '10.40.7.183';
-const PRINTER_PORT = 9100;
+const PRINTER_IP = process.env.PRINTER_IP;
+const PRINTER_PORT = process.env.PRINTER_PORT;
 
 // Express App Setup
+const EXPRESS_PORT = process.env.EXPRESS_PORT;
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -181,7 +219,6 @@ rfidServer.listen(RFID_TCP_PORT, () => {
 });
 
 // Start Express server
-const EXPRESS_PORT = 3001;
 app.listen(EXPRESS_PORT, () => {
     console.log(`Express server listening on port ${EXPRESS_PORT}`);
 });

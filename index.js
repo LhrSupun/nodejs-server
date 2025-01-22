@@ -156,6 +156,14 @@ app.post('/api/print', async (req, res) => {
             printer.leftRight(`${printData.out_time}  `, `${printData.out_weight}`);
             printer.setTextNormal();
             printer.newLine();
+            printer.drawLine();
+            
+            printer.setTextNormal();
+            printer.setTextDoubleHeight();
+            printer.bold(true);
+            printer.leftRight(`Gross Weight  `, `${printData.gross_weight}`);
+            printer.setTextNormal();
+            printer.newLine();
         } else {
             printer.drawLine();
         }

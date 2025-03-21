@@ -5,6 +5,8 @@ const cors = require('cors');
 const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
 const os = require('os');
+const { exec } = require('child_process');
+const printDi = require('printer');
 
 // Load environment variables
 require('dotenv').config();
@@ -41,7 +43,6 @@ function checkHostIP() {
 // Run the IP address check at startup
 checkHostIP();
 
-
 // RFID TCP Server Configuration
 const RFID_TCP_PORT = process.env.RFID_TCP_PORT;
 const RFID_WS_PORT = process.env.RFID_WS_PORT;
@@ -54,6 +55,8 @@ const WEIGHT_WS_PORT = process.env.WEIGHT_WS_PORT;
 // Thermal Printer Configuration
 const PRINTER_IP = process.env.PRINTER_IP;
 const PRINTER_PORT = process.env.PRINTER_PORT;
+const PRINTER_CONNECTION = process.env.PRINTER_CONNECTION || 'NETWORK'; // Default to NETWORK if not specified
+const PRINTER_USB_NAME = process.env.PRINTER_USB_NAME || 'EPSON TM-T81 Receipt';
 
 // Express App Setup
 const EXPRESS_PORT = process.env.EXPRESS_PORT;
@@ -88,8 +91,37 @@ function broadcastWeight(data) {
     });
 }
 
-// Printer initialization function
-async function initPrinter() {
+// Function to list Windows printers
+function listWindowsPrinters() {
+    return new Promise((resolve, reject) => {
+        exec('wmic printer get name', (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error listing printers: ${error.message}`);
+                reject(error);
+                return;
+            }
+            if (stderr) {
+                console.error(`stderr: ${stderr}`);
+                reject(new Error(stderr));
+                return;
+            }
+
+            const printerList = stdout.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && line !== 'Name')
+                .sort();
+
+            console.log('Available printers:');
+            printerList.forEach(printer => console.log(`- ${printer}`));
+
+            resolve(printerList);
+        });
+    });
+}
+
+// Network printer initialization function
+function initNetworkPrinter() {
+    console.log(`Connecting to network printer at ${PRINTER_IP}:${PRINTER_PORT}`);
     let printer = new ThermalPrinter({
         type: PrinterTypes.EPSON,
         interface: `tcp://${PRINTER_IP}:${PRINTER_PORT}`,
@@ -101,15 +133,67 @@ async function initPrinter() {
     return printer;
 }
 
+// Windows printer initialization function
+function initWindowsPrinter(printerName) {
+    console.log(`Connecting to Windows printer: ${printerName}`);
+    let printer = new ThermalPrinter({
+        type: PrinterTypes.EPSON,
+        interface: `printer:${printerName}`,
+        driver: {},
+        options: {
+            timeout: 5000
+        },
+        width: 48
+    });
+    return printer;
+}
+
+// Printer initialization function
+async function initPrinter() {
+    if (PRINTER_CONNECTION.toUpperCase() === 'USB') {
+        console.log(`Looking for USB printer via Windows: ${PRINTER_USB_NAME}`);
+        try {
+            // List available Windows printers
+            const printers = await listWindowsPrinters();
+
+            // Find printer that matches our desired name
+            const matchingPrinter = printers.find(printer =>
+                printer.toLowerCase().includes(PRINTER_USB_NAME.toLowerCase()));
+
+            if (matchingPrinter) {
+                console.log(`Found matching printer: ${matchingPrinter}`);
+                return initWindowsPrinter(matchingPrinter);
+            } else {
+                console.warn(`Windows printer "${PRINTER_USB_NAME}" not found, falling back to network printer`);
+                return initNetworkPrinter();
+            }
+        } catch (error) {
+            console.error(`Error finding Windows printer: ${error.message}`);
+            console.warn('Falling back to network printer');
+            return initNetworkPrinter();
+        }
+    } else {
+        return initNetworkPrinter();
+    }
+}
+
 // Print endpoint
 app.post('/api/print', async (req, res) => {
     try {
         const { printData } = req.body;
         const printer = await initPrinter();
 
-        const isConnected = await printer.isPrinterConnected();
+        // Check if printer is connected, with error handling
+        let isConnected = false;
+        try {
+            isConnected = await printer.isPrinterConnected();
+        } catch (error) {
+            console.error(`Error checking printer connection: ${error.message}`);
+        }
+
         if (!isConnected) {
-            throw new Error('Printer is not connected');
+            console.error('Printer is not connected, attempting to print anyway');
+            // Continue anyway, some printer drivers might still work
         }
 
         // Header
@@ -157,7 +241,7 @@ app.post('/api/print', async (req, res) => {
             printer.setTextNormal();
             printer.newLine();
             printer.drawLine();
-            
+
             printer.setTextNormal();
             printer.setTextDoubleHeight();
             printer.bold(true);
@@ -168,7 +252,37 @@ app.post('/api/print', async (req, res) => {
             printer.drawLine();
         }
         printer.cut();
-        await printer.execute();
+
+        try {
+            if (PRINTER_CONNECTION.toUpperCase() !== 'USB') {
+                await printer.execute();
+            } else {
+                printDi.printDirect({
+                    data : printer.getBuffer(),
+                    printer : PRINTER_USB_NAME,
+                    type: 'RAW',
+                    success: () => {
+                        console.log('Print job executed successfully');
+                        printer.clear();
+                    },
+                    error: (error) => {
+                        console.error(`Error executing print job: ${error.message}`);
+                        // Try to print using system print command as a fallback
+                        // printFallback(printData);
+                    }
+                })
+            }
+            console.log('Print job executed successfully');
+        } catch (error) {
+            console.error(`Error executing print job: ${error.message}`);
+            // Try to print using system print command as a fallback
+            // if (PRINTER_CONNECTION.toUpperCase() === 'USB') {
+            //     await printFallback(printData);
+            // } else {
+            //     throw error;
+            // }
+            throw error;
+        }
 
         return res.json({ success: true, message: 'Print job sent successfully' });
     } catch (error) {
@@ -219,6 +333,11 @@ weightClient.on('close', () => {
 
 weightClient.on('error', (err) => {
     console.error('Weight scale connection error:', err);
+});
+
+// List printers on startup
+listWindowsPrinters().catch(err => {
+    console.warn('Could not list Windows printers:', err.message);
 });
 
 // Start servers

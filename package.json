@@ -5,7 +5,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "pkg": "npx pkg -t node*-linux-x64,node*-macos-x64,node*-win-x64 index.js"
+    "pkg": "npx pkg -t node*-win-x64 index.js"
   },
   "keywords": [],
   "author": "",

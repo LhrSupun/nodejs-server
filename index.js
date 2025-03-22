@@ -6,7 +6,7 @@ const ThermalPrinter = require('node-thermal-printer').printer;
 const PrinterTypes = require('node-thermal-printer').types;
 const os = require('os');
 const { exec } = require('child_process');
-const printDi = require('printer');
+// const printDi = require('printer');
 
 // Load environment variables
 require('dotenv').config();
@@ -138,7 +138,8 @@ function initWindowsPrinter(printerName) {
     console.log(`Connecting to Windows printer: ${printerName}`);
     let printer = new ThermalPrinter({
         type: PrinterTypes.EPSON,
-        interface: `printer:${printerName}`,
+        // interface: `printer:${printerName}`,
+        interface: 'usb',
         driver: {},
         options: {
             timeout: 5000
@@ -254,24 +255,24 @@ app.post('/api/print', async (req, res) => {
         printer.cut();
 
         try {
-            if (PRINTER_CONNECTION.toUpperCase() !== 'USB') {
-                await printer.execute();
-            } else {
-                printDi.printDirect({
-                    data : printer.getBuffer(),
-                    printer : PRINTER_USB_NAME,
-                    type: 'RAW',
-                    success: () => {
-                        console.log('Print job executed successfully');
-                        printer.clear();
-                    },
-                    error: (error) => {
-                        console.error(`Error executing print job: ${error.message}`);
-                        // Try to print using system print command as a fallback
-                        // printFallback(printData);
-                    }
-                })
-            }
+            await printer.execute();
+            // if (PRINTER_CONNECTION.toUpperCase() !== 'USB') {
+            // } else {
+            //     printDi.printDirect({
+            //         data : printer.getBuffer(),
+            //         printer : PRINTER_USB_NAME,
+            //         type: 'RAW',
+            //         success: () => {
+            //             console.log('Print job executed successfully');
+            //             printer.clear();
+            //         },
+            //         error: (error) => {
+            //             console.error(`Error executing print job: ${error.message}`);
+            //             // Try to print using system print command as a fallback
+            //             // printFallback(printData);
+            //         }
+            //     })
+            // }
             console.log('Print job executed successfully');
         } catch (error) {
             console.error(`Error executing print job: ${error.message}`);
